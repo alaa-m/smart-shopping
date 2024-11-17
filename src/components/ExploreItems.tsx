@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Folder, ChevronDown, ChevronRight, ShoppingBag, Send, Plus, Minus } from 'lucide-react';
+import { Folder, ChevronDown, ChevronRight, ShoppingBag, Send, Plus, Minus, X } from 'lucide-react';
 import { db, ItemType, Item } from '../db/database';
 import toast from 'react-hot-toast';
 
 export default function ExploreItems() {
   const [expandedTypes, setExpandedTypes] = useState<Set<number>>(new Set());
-  const [selectedItems, setSelectedItems] = useState<Map<number, number>>(new Map()); // itemId -> quantity
+  const [selectedItems, setSelectedItems] = useState<Map<number, number>>(new Map());
+  const [showModal, setShowModal] = useState(false);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [newItem, setNewItem] = useState({ name: '', description: '' });
 
   const itemTypes = useLiveQuery(() => db.itemTypes.toArray());
   const items = useLiveQuery(() => db.items.toArray());
@@ -19,6 +22,30 @@ export default function ExploreItems() {
       newExpanded.add(typeId);
     }
     setExpandedTypes(newExpanded);
+  };
+
+  const openAddItemModal = (typeId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedTypeId(typeId);
+    setShowModal(true);
+  };
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTypeId) return;
+
+    try {
+      await db.items.add({
+        ...newItem,
+        typeId: selectedTypeId,
+        price: 0
+      });
+      toast.success('Item added successfully');
+      setNewItem({ name: '', description: '' });
+      setShowModal(false);
+    } catch (error) {
+      toast.error('Error adding item');
+    }
   };
 
   const updateItemQuantity = (itemId: number, increment: boolean) => {
@@ -40,21 +67,32 @@ export default function ExploreItems() {
       return;
     }
 
-    const selectedItemsList = Array.from(selectedItems.entries()).map(([itemId, quantity]) => {
+    // Group items by type
+    const groupedItems = new Map<number, { typeName: string; items: { name: string; quantity: number }[] }>();
+
+    selectedItems.forEach((quantity, itemId) => {
       const item = items?.find(i => i.id === itemId);
-      return {
-        name: item?.name || '',
-        quantity
-      };
+      if (item) {
+        const type = itemTypes?.find(t => t.id === item.typeId);
+        if (type && type.id) {
+          if (!groupedItems.has(type.id)) {
+            groupedItems.set(type.id, { typeName: type.name, items: [] });
+          }
+          groupedItems.get(type.id)?.items.push({
+            name: item.name,
+            quantity
+          });
+        }
+      }
     });
 
-    const message = selectedItemsList
-      .map(item => `${item.quantity}x ${item.name}`)
-      .join('\n');
+    const message = `قائمة المشتريات:\n\n${Array.from(groupedItems.values())
+      .map(group => `${group.typeName}:\n${group.items
+        .map(item => `${item.name}`)
+        .join('\n')}`)
+      .join('\n\n')}`;
 
-    const finalMessage = `Shopping List:\n${message}`;
-
-    window.open(`https://api.whatsapp.com/send?phone=963944930258&text=${encodeURIComponent(finalMessage)}`);
+    window.open(`https://api.whatsapp.com/send?phone=963944930258&text=${encodeURIComponent(message)}`);
   };
 
   return (
@@ -81,6 +119,12 @@ export default function ExploreItems() {
                   )}
                   <Folder size={20} className="text-blue-500" />
                   <span>{type.name}</span>
+                  <button
+                    onClick={(e) => type.id && openAddItemModal(type.id, e)}
+                    className="ml-auto p-1 text-gray-600 hover:text-gray-800 hover:bg-gray-200 rounded-full"
+                  >
+                    <Plus size={16} />
+                  </button>
                 </div>
                 
                 {expandedTypes.has(type.id!) && (
@@ -174,6 +218,51 @@ export default function ExploreItems() {
           )}
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Add New Item</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleAddItem}>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Name</label>
+                  <input
+                    type="text"
+                    value={newItem.name}
+                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <input
+                    type="text"
+                    value={newItem.description}
+                    onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Save Item
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -12,8 +12,11 @@ export default function ItemManager() {
     description: ''
   });
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedType, setSelectedType] = useState<number>(0);
 
-  const items = useLiveQuery(() => db.items.toArray());
+  const items = useLiveQuery(
+    () => selectedType ? db.items.where('typeId').equals(selectedType).toArray() : db.items.toArray()
+  );
   const itemTypes = useLiveQuery(() => db.itemTypes.toArray());
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +29,7 @@ export default function ItemManager() {
         await db.items.add(newItem);
         toast.success('Item added successfully');
       }
-      setNewItem({ typeId: 0, name: '', price: 0, description: '' });
+      setNewItem({ typeId: selectedType, name: '', price: 0, description: '' });
       setEditingId(null);
     } catch (error) {
       toast.error('Error saving item');
@@ -54,8 +57,12 @@ export default function ItemManager() {
       <form onSubmit={handleSubmit} className="mb-8">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <select
-            value={newItem.typeId}
-            onChange={(e) => setNewItem({ ...newItem, typeId: Number(e.target.value) })}
+            value={newItem.typeId || selectedType}
+            onChange={(e) => {
+              const value = Number(e.target.value);
+              setSelectedType(value);
+              setNewItem({ ...newItem, typeId: value });
+            }}
             className="p-2 border rounded"
             required
           >
