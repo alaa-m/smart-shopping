@@ -60,24 +60,12 @@ function App() {
               <ShoppingBag size={20} />
               Items
             </button>
-            <button
-              onClick={() => setActiveTab('cart')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md ${
-                activeTab === 'cart'
-                  ? 'bg-white text-blue-600 shadow'
-                  : 'text-gray-600 hover:text-gray-800'
-              }`}
-            >
-              <CartIcon size={20} />
-              Cart
-            </button>
           </div>
         </div>
 
         {activeTab === 'explore' && <ExploreItems />}
         {activeTab === 'types' && <ItemTypeManager />}
         {activeTab === 'items' && <ItemManager />}
-        {activeTab === 'cart' && <ShoppingCart />}
       </main>
     </div>
   );
